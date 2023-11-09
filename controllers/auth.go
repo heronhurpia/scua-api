@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/heronhurpia/jwt-gin/models"
-	"github.com/heronhurpia/jwt-gin/utils/token"
+	"github.com/heronhurpia/scua-api/models"
+	"github.com/heronhurpia/scua-api/utils/token"
 )
 
 func CurrentUser(c *gin.Context) {

@@ -6,7 +6,6 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-collections/collections v0.0.0-20130729185459-604e922904d3
-	github.com/heronhurpia/jwt-gin v0.0.0-20231108185728-5ced34b09002
 	github.com/jackc/pgx/v5 v5.5.0
 	github.com/jinzhu/gorm v1.9.16
 	github.com/joho/godotenv v1.5.1

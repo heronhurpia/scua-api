@@ -3,7 +3,7 @@ package middlewares
 import (
 	"net/http"
 
-	"github.com/heronhurpia/jwt-gin/utils/token"
+	"github.com/heronhurpia/scua-api/utils/token"
 
 	"github.com/gin-gonic/gin"
 )
