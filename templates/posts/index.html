@@ -1,0 +1,28 @@
+{{ define "posts/index.html" }}
+
+<!doctype html>
+<html lang="pt-br">
+
+{{ template "layouts/header.tmpl" .}}
+<main>
+ 
+<div class="container m-5">
+	<ul class="list-group">
+		<li class="list-group-item">An item</li>
+		<li class="list-group-item">A second item</li>
+		<li class="list-group-item">A third item</li>
+		<li class="list-group-item">A fourth item</li>
+		<li class="list-group-item">And a fifth one</li>
+	</ul>
+
+    <span>{{.message}}</span>
+</div>
+
+</main>
+{{ range $videoId, $videoName := . }}
+    <span>{{ $videoName }}</span>
+{{ end }}
+
+{{ template "layouts/footer.tmpl" .}}
+
+{{ end }}
