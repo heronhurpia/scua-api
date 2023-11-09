@@ -10,7 +10,7 @@ RUN addgroup -S century \
     && adduser -S -u 10000 -g century century
 
 WORKDIR /src
-COPY ./go.mod ./go.sum ./*.go ./
+COPY . ./
 RUN go mod download
 
 # Run tests
