@@ -10,10 +10,8 @@ RUN addgroup -S century \
     && adduser -S -u 10000 -g century century
 
 WORKDIR /src
-COPY ./go.mod ./go.sum ./
+COPY ./go.mod ./go.sum ./*.go ./
 RUN go mod download
-
-COPY ./ ./
 
 # Run tests
 # RUN CGO_ENABLED=0 go test -timeout 30s -v github.com/???
@@ -21,7 +19,7 @@ COPY ./ ./
 # Build the executable
 RUN CGO_ENABLED=0 go build \
     -installsuffix 'static' \
-    -o /app ./cmd/app
+    -o /app .
 
 # STAGE 2: build the container to run
 FROM scratch AS final
