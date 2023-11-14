@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -61,7 +62,14 @@ func FindScua(c *gin.Context) {
 // Abre arquivo lista de scua e salva na RAM
 func Init() {
 
-	f, _ := os.Open(data_filename)
+	//f, _ := os.Open(data_filename)
+	// If the file doesn't exist, create it, or append to the file
+	// f, err := os.OpenFile("access.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	f, err := os.OpenFile(data_filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer f.Close()
 
 	scua_set = set.New()
