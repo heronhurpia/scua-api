@@ -23,7 +23,7 @@ var data_filename = "scua_data.idx"
 
 // "H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset
 var api_url = "http://localhost:3011/api/get_scua_list"
-var api_limit = 1000
+var api_limit = 100000
 var api_authorization = "Token"
 var api_token = "744qy4iapitwh3q6"
 var m sync.Mutex
@@ -156,7 +156,11 @@ func updateScuaList() {
 	for {
 		// Início da verificação
 		offset := scua_set.Len()
-		fmt.Printf("Total de receptores na memória: %d\n", offset)
+
+		now := time.Now()
+		fmt.Print("\n")
+		fmt.Println(now.Format("15:04:05"), " - busca de novos receptores no DB")
+		fmt.Println(now.Format("15:04:05"), " - total de receptores na memória: ", offset)
 
 		// Create an HTTP client
 		client := &http.Client{}
@@ -173,7 +177,8 @@ func updateScuaList() {
 		req.Header.Add(api_authorization, api_token)
 
 		// Send the HTTP request
-		fmt.Printf("req: %s\n", req.URL)
+		now = time.Now()
+		fmt.Println(now.Format("15:04:05"), " -", req.URL)
 		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Println("Error sending HTTP request:", err)
@@ -189,10 +194,12 @@ func updateScuaList() {
 
 		// Verifica resposta da api
 		var lines int = strings.Count(string(body), "\n")
-		fmt.Printf("Total de linhas recebidas da API: %d\n", lines)
+		now = time.Now()
+		fmt.Println(now.Format("15:04:05"), " - total de linhas recebidas da API: ", lines)
 		if lines == 0 {
 			/* Tempo para nova varredura  */
-			time.Sleep(60 * time.Minute)
+			fmt.Println("Não foram encontrados novos scuas no db")
+			time.Sleep(6 * 60 * time.Minute)
 			continue
 		}
 
@@ -215,6 +222,8 @@ func updateScuaList() {
 		}
 		f.Close()
 
-		time.Sleep(1 * time.Minute)
+		now = time.Now()
+		fmt.Println(now.Format("15:04:05"), " - fim da atualização da lista de scuas")
+		time.Sleep(60 * time.Minute)
 	}
 }
