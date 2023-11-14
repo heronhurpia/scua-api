@@ -23,3 +23,10 @@ docker build -t scua-api .
 docker run -it --rm --name my-running-app scua-api
 docker run --rm -v "$PWD":/usr/src/myapp -w /usr/src/myapp golang:1.21 go build -v
 
+
+### todo
++ criar lista de constantes no controller
++ Nome do arquivo
++ quantidade de busca
++ rul da API
++ Verificar se arquivo existe na inicializaçao, se não existe, criar
