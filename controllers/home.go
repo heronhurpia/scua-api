@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/golang-collections/collections/set"
 
@@ -49,7 +51,9 @@ func FindScua(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, res)
 }
 
+// Abre arquivo lista de scua e salva na RAM
 func Init() {
+
 	f, _ := os.Open(data_filename)
 	defer f.Close()
 
@@ -62,8 +66,11 @@ func Init() {
 		scua_set.Insert(string(s))
 		s, _, e = r.ReadLine()
 	}
+
+	go updateScuaList()
 }
 
+// Cosulat DB e cria arquivo
 func InitDB() uint64 {
 	url := "postgresql://m2/logprodv6"
 	conn, err := pgx.Connect(context.Background(), url)
@@ -119,4 +126,57 @@ func Update(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, res)
+}
+
+// Roda periódicamente buscando atualizações no banco de dados
+func updateScuaList() {
+
+	time.Sleep(5 * time.Second)
+	limit := 10
+
+	for {
+		// Início da verificação
+		offset := scua_set.Len()
+		fmt.Printf("Total de receptores na memória: %d\n", offset)
+
+		// Fazer a busca de novos receptores
+		//var api string = fmt.Sprintf("H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset)
+		var url string = fmt.Sprintf("http://localhost:3011/api/get_scua_list?limit=%d&offset=%d", limit, offset)
+		fmt.Printf("url: %s\n", url)
+
+		// Create an HTTP client
+		client := &http.Client{}
+
+		// Create an HTTP request with custom headers
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			fmt.Println("Error creating HTTP request:", err)
+			return
+		}
+		req.Header.Add("Token", "744qy4iapitwh3q6")
+		//req.Header.Add("Authorization", "Bearer <token>")
+		//req.Header.Add("Content-Type", "application/json")
+
+		// Send the HTTP request
+		fmt.Printf("req: %s\n", req.URL)
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Println("Error sending HTTP request:", err)
+			return
+		}
+
+		// Read the response body
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Println("Error reading HTTP response body:", err)
+			return
+		}
+
+		// Print the response body
+		fmt.Println("Resposta:")
+		fmt.Println(string(body))
+
+		/* Tempo para nova varredura  */
+		time.Sleep(10 * time.Minute)
+	}
 }

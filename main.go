@@ -9,7 +9,7 @@ import (
 
 func main() {
 
-	controllers.InitDB()
+	//	controllers.InitDB()
 	controllers.Init()
 
 	models.ConnectDataBase()
