@@ -192,7 +192,7 @@ func updateScuaList() {
 		fmt.Printf("Total de linhas recebidas da API: %d\n", lines)
 		if lines == 0 {
 			/* Tempo para nova varredura  */
-			time.Sleep(10 * time.Minute)
+			time.Sleep(60 * time.Minute)
 			continue
 		}
 

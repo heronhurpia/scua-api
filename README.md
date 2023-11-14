@@ -29,4 +29,4 @@ docker run --rm -v "$PWD":/usr/src/myapp -w /usr/src/myapp golang:1.21 go build 
 + ~~Nome do arquivo~~
 + ~~quantidade de busca~~
 + ~~url da API~~
-+ Verificar se arquivo existe na inicializaçao, se não existe, criar
++ ~~Verificar se arquivo existe na inicializaçao, se não existe, criar~~
