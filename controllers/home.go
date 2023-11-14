@@ -15,8 +15,15 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// Lista de constantes
 var scua_set *set.Set
 var data_filename = "scua_data.idx"
+
+// "H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset
+var api_url = "http://localhost:3011/api/get_scua_list"
+var api_limit = 10
+var api_authorization = "Token"
+var api_token = "744qy4iapitwh3q6"
 
 type response struct {
 	Result  bool   `json:"res"`
@@ -132,20 +139,17 @@ func Update(c *gin.Context) {
 func updateScuaList() {
 
 	time.Sleep(5 * time.Second)
-	limit := 10
 
 	for {
 		// Início da verificação
 		offset := scua_set.Len()
 		fmt.Printf("Total de receptores na memória: %d\n", offset)
 
-		// Fazer a busca de novos receptores
-		//var api string = fmt.Sprintf("H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset)
-		var url string = fmt.Sprintf("http://localhost:3011/api/get_scua_list?limit=%d&offset=%d", limit, offset)
-		fmt.Printf("url: %s\n", url)
-
 		// Create an HTTP client
 		client := &http.Client{}
+
+		// Fazer a busca de novos receptores
+		var url string = fmt.Sprintf("%s?limit=%d&offset=%d", api_url, api_limit, offset)
 
 		// Create an HTTP request with custom headers
 		req, err := http.NewRequest("GET", url, nil)
@@ -153,9 +157,7 @@ func updateScuaList() {
 			fmt.Println("Error creating HTTP request:", err)
 			return
 		}
-		req.Header.Add("Token", "744qy4iapitwh3q6")
-		//req.Header.Add("Authorization", "Bearer <token>")
-		//req.Header.Add("Content-Type", "application/json")
+		req.Header.Add(api_authorization, api_token)
 
 		// Send the HTTP request
 		fmt.Printf("req: %s\n", req.URL)
