@@ -5,9 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-collections/collections/set"
@@ -25,10 +26,17 @@ var api_url = "http://localhost:3011/api/get_scua_list"
 var api_limit = 10
 var api_authorization = "Token"
 var api_token = "744qy4iapitwh3q6"
+var m sync.Mutex
 
 type response struct {
 	Result  bool   `json:"res"`
 	Message string `json:"message"`
+}
+
+// SafeCounter is safe to use concurrently.
+type SafeSet struct {
+	mu   sync.Mutex
+	scua set.Set
 }
 
 // getAlbums responds with the list of all albums as JSON.
@@ -62,22 +70,25 @@ func FindScua(c *gin.Context) {
 // Abre arquivo lista de scua e salva na RAM
 func Init() {
 
-	//f, _ := os.Open(data_filename)
-	// If the file doesn't exist, create it, or append to the file
-	// f, err := os.OpenFile("access.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-
-	f, err := os.OpenFile(data_filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
+	// Verifica se arquivo existe e se não existe, criar
+	if _, err := os.Stat(data_filename); os.IsNotExist(err) {
+		_, err := os.Create(data_filename)
+		if err != nil {
+			panic(err)
+		}
 	}
+
+	// Abre arquivo com a lista de receptores
+	f, _ := os.Open(data_filename)
 	defer f.Close()
 
+	// Inicia variável com lista de receptores em RAM
 	scua_set = set.New()
 
+	fmt.Println("Lista de receptores:")
 	r := bufio.NewReader(f)
 	s, _, e := r.ReadLine()
 	for e == nil {
-		//fmt.Println(string(s))
 		scua_set.Insert(string(s))
 		s, _, e = r.ReadLine()
 	}
@@ -185,6 +196,25 @@ func updateScuaList() {
 		// Print the response body
 		fmt.Println("Resposta:")
 		fmt.Println(string(body))
+
+		// Separa resposta linha por linha e salva na lista de scua
+		sc := bufio.NewScanner(strings.NewReader(string(body)))
+		for sc.Scan() {
+			// Salva dados garantindo não concorrente
+			m.Lock()
+			scua_set.Insert(string(sc.Text()))
+			m.Unlock()
+		}
+
+		// Acrescenta os dados recebidos ao arquivo
+		f, err := os.OpenFile(data_filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			panic(err)
+		}
+		if _, err = f.WriteString(string(body)); err != nil {
+			panic(err)
+		}
+		f.Close()
 
 		/* Tempo para nova varredura  */
 		time.Sleep(10 * time.Minute)
