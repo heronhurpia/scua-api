@@ -23,7 +23,7 @@ var data_filename = "scua_data.idx"
 
 // "H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset
 var api_url = "http://localhost:3011/api/get_scua_list"
-var api_limit = 10
+var api_limit = 1000
 var api_authorization = "Token"
 var api_token = "744qy4iapitwh3q6"
 var m sync.Mutex
@@ -31,12 +31,6 @@ var m sync.Mutex
 type response struct {
 	Result  bool   `json:"res"`
 	Message string `json:"message"`
-}
-
-// SafeCounter is safe to use concurrently.
-type SafeSet struct {
-	mu   sync.Mutex
-	scua set.Set
 }
 
 // getAlbums responds with the list of all albums as JSON.
@@ -193,9 +187,14 @@ func updateScuaList() {
 			return
 		}
 
-		// Print the response body
-		fmt.Println("Resposta:")
-		fmt.Println(string(body))
+		// Verifica resposta da api
+		var lines int = strings.Count(string(body), "\n")
+		fmt.Printf("Total de linhas recebidas da API: %d\n", lines)
+		if lines == 0 {
+			/* Tempo para nova varredura  */
+			time.Sleep(10 * time.Minute)
+			continue
+		}
 
 		// Separa resposta linha por linha e salva na lista de scua
 		sc := bufio.NewScanner(strings.NewReader(string(body)))
@@ -216,7 +215,6 @@ func updateScuaList() {
 		}
 		f.Close()
 
-		/* Tempo para nova varredura  */
-		time.Sleep(10 * time.Minute)
+		time.Sleep(1 * time.Minute)
 	}
 }
