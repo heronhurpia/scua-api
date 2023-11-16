@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +25,7 @@ var data_filename = "scua_data.idx"
 
 // "H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset
 var api_url = "http://localhost:3011/api/get_scua_list"
-var api_limit = 100000
+var api_limit = 10
 var api_authorization = "Token"
 var api_token = "744qy4iapitwh3q6"
 var m sync.Mutex
@@ -151,66 +153,54 @@ func Update(c *gin.Context) {
 // Roda periódicamente buscando atualizações no banco de dados
 func updateScuaList() {
 
+	// Atraso inicial apenas para não misturar mensagens de log
 	time.Sleep(5 * time.Second)
 
 	for {
-		// Início da verificação
+
+		// Busca lista de scua
 		offset := scua_set.Len()
+		body, err := get_scua_list(offset)
 
-		now := time.Now()
-		fmt.Print("\n")
-		fmt.Println(now.Format("15:04:05"), " - busca de novos receptores no DB")
-		fmt.Println(now.Format("15:04:05"), " - total de receptores na memória: ", offset)
-
-		// Create an HTTP client
-		client := &http.Client{}
-
-		// Fazer a busca de novos receptores
-		var url string = fmt.Sprintf("%s?limit=%d&offset=%d", api_url, api_limit, offset)
-
-		// Create an HTTP request with custom headers
-		req, err := http.NewRequest("GET", url, nil)
+		// Se não consegiu contato com API, entrar em standby
 		if err != nil {
-			fmt.Println("Error creating HTTP request:", err)
-			return
-		}
-		req.Header.Add(api_authorization, api_token)
-
-		// Send the HTTP request
-		now = time.Now()
-		fmt.Println(now.Format("15:04:05"), " -", req.URL)
-		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Println("Error sending HTTP request:", err)
-			return
+			log.Fatal(err)
+			time.Sleep(60 * time.Minute)
+			continue
 		}
 
-		// Read the response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println("Error reading HTTP response body:", err)
-			return
-		}
-
-		// Verifica resposta da api
-		var lines int = strings.Count(string(body), "\n")
-		now = time.Now()
-		fmt.Println(now.Format("15:04:05"), " - total de linhas recebidas da API: ", lines)
-		if lines == 0 {
-			/* Tempo para nova varredura  */
+		// Caso não existam novas linhas, entrar em standby por 1 hora
+		if len(body) == 0 {
 			fmt.Println("Não foram encontrados novos scuas no db")
-			time.Sleep(6 * 60 * time.Minute)
+			time.Sleep(60 * time.Minute)
 			continue
 		}
 
 		// Separa resposta linha por linha e salva na lista de scua
 		sc := bufio.NewScanner(strings.NewReader(string(body)))
 		for sc.Scan() {
-			// Salva dados garantindo não concorrente
-			m.Lock()
-			scua_set.Insert(string(sc.Text()))
-			m.Unlock()
+
+			// Verifica se a linha corresponde a um receptor válido
+			if isValidScua(sc.Text()) {
+				// Salva dados garantindo não concorrente
+				m.Lock()
+				scua_set.Insert(string(sc.Text()))
+				m.Unlock()
+			}
 		}
+
+		// Fim da verificação
+		now := time.Now()
+		final := scua_set.Len()
+		fmt.Println(now.Format("15:04:05"), " - total de receptores na memória: ", final)
+
+		/* Se não houve alteração na quantidade receptores, entra em standby */
+		if offset == final {
+			fmt.Println(now.Format("15:04:05"), " - não houve alteração no total de receptores")
+			time.Sleep(time.Minute)
+			continue
+		}
+		fmt.Println(now.Format("15:04:05"), " - acrescentar ", final-offset, " receptores")
 
 		// Acrescenta os dados recebidos ao arquivo
 		f, err := os.OpenFile(data_filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
@@ -224,6 +214,99 @@ func updateScuaList() {
 
 		now = time.Now()
 		fmt.Println(now.Format("15:04:05"), " - fim da atualização da lista de scuas")
-		time.Sleep(60 * time.Minute)
+		time.Sleep(time.Minute)
 	}
+}
+
+// Verifica se scua é válido
+func isValidScua(scua string) bool {
+	return isNagra(scua) || isVerimatrix(scua)
+}
+
+func isNagra(scua string) bool {
+
+	result := true
+
+	// Cada scua tem o tamanho fixo de 12 bytes
+	if len(scua) != 12 {
+		result = false
+	} else {
+		// Os 12 carateres tem que ser numéricos
+		if _, err := strconv.Atoi(scua); err != nil {
+			result = false
+		}
+	}
+
+	if result {
+		fmt.Printf("%q: Nagra\n", scua)
+	}
+	return result
+}
+
+func isVerimatrix(scua string) bool {
+
+	result := true
+
+	// Cada scua tem o tamanho fixo de 12 bytes
+	if len(scua) != 12 {
+		result = false
+	} else {
+		// O primeiro caracter tem que er "N"
+		if scua[:1] != "N" {
+			result = false
+		}
+
+		// Os 11 últimos carateres tem que ser numéricos
+		if _, err := strconv.Atoi(scua[1:]); err != nil {
+			result = false
+		}
+	}
+
+	if result {
+		fmt.Printf("%q: Verimatrix\n", scua)
+	}
+	return result
+}
+
+// Busca lista de recetores na api
+func get_scua_list(offset int) (string, error) {
+
+	fmt.Println("")
+	fmt.Println(time.Now().Format("15:04:05"), " - total de receptores na memória: ", offset)
+
+	// Create an HTTP client
+	client := &http.Client{}
+
+	// Fazer a busca de novos receptores
+	var url string = fmt.Sprintf("%s?limit=%d&offset=%d", api_url, api_limit, offset)
+
+	// Create an HTTP request with custom headers
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println("Error creating HTTP request:", err)
+		return "", err
+	}
+	req.Header.Add(api_authorization, api_token)
+
+	// Send the HTTP request
+	fmt.Println(time.Now().Format("15:04:05"), " -", req.URL)
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error sending HTTP request:", err)
+		return "", err
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("Error reading HTTP response body:", err)
+		return "", err
+	}
+
+	// Verifica resposta da api
+	var lines int = strings.Count(string(body), "\n")
+	fmt.Println(time.Now().Format("15:04:05"), " - total de linhas recebidas da API: ", lines)
+
+	return string(body), nil
+
 }

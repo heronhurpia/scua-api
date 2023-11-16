@@ -23,6 +23,8 @@ docker build -t scua-api .
 docker run -it --rm --name my-running-app scua-api
 docker run --rm -v "$PWD":/usr/src/myapp -w /usr/src/myapp golang:1.21 go build -v
 
+Comando de teste:
+curl -H "Token: 744qy4iapitwh3q6" 'http://localhost:3011/api/get_scua_list?limit=10&offset=10'
 
 ### todo
 + ~~criar lista de constantes no controller~~
