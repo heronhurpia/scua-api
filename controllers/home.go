@@ -182,7 +182,7 @@ func updateScuaList() {
 
 			// Verifica se a linha corresponde a um receptor válido
 			if isValidScua(sc.Text()) {
-				// Salva dados garantindo não concorrente
+				// Salva dados garantindo acesso não concorrente
 				m.Lock()
 				scua_set.Insert(string(sc.Text()))
 				m.Unlock()
@@ -190,17 +190,16 @@ func updateScuaList() {
 		}
 
 		// Fim da verificação
-		now := time.Now()
 		final := scua_set.Len()
-		fmt.Println(now.Format("15:04:05"), " - total de receptores na memória: ", final)
+		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores na memória: ", final)
 
 		/* Se não houve alteração na quantidade receptores, entra em standby */
 		if offset == final {
-			fmt.Println(now.Format("15:04:05"), " - não houve alteração no total de receptores")
+			fmt.Println(time.Now().Format("15:04:05"), " - não houve alteração no total de receptores")
 			time.Sleep(time.Minute)
 			continue
 		}
-		fmt.Println(now.Format("15:04:05"), " - acrescentar ", final-offset, " receptores")
+		fmt.Println(time.Now().Format("15:04:05"), " - acrescentar ", final-offset, " receptores")
 
 		// Acrescenta os dados recebidos ao arquivo
 		f, err := os.OpenFile(data_filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
@@ -212,8 +211,7 @@ func updateScuaList() {
 		}
 		f.Close()
 
-		now = time.Now()
-		fmt.Println(now.Format("15:04:05"), " - fim da atualização da lista de scuas")
+		fmt.Println(time.Now().Format("15:04:05"), " - fim da atualização da lista de scuas")
 		time.Sleep(time.Minute)
 	}
 }

@@ -27,6 +27,9 @@ Comando de teste:
 curl -H "Token: 744qy4iapitwh3q6" 'http://localhost:3011/api/get_scua_list?limit=10&offset=10'
 
 ### todo
++ ~~Separar função para busca na url~~
++ Simular resposta errada da api
++ ~~Criar validador de resposta com lista de receptores~~
 + ~~criar lista de constantes no controller~~
 + ~~Nome do arquivo~~
 + ~~quantidade de busca~~
