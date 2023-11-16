@@ -25,7 +25,7 @@ var data_filename = "scua_data.idx"
 
 // "H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset
 var api_url = "http://localhost:3011/api/get_scua_list"
-var api_limit = 10
+var api_limit = 100
 var api_authorization = "Token"
 var api_token = "744qy4iapitwh3q6"
 var m sync.Mutex
@@ -186,6 +186,9 @@ func updateScuaList() {
 				m.Lock()
 				scua_set.Insert(string(sc.Text()))
 				m.Unlock()
+			} else {
+				fmt.Printf("%q inválido\n", sc.Text())
+				break
 			}
 		}
 
@@ -235,9 +238,9 @@ func isNagra(scua string) bool {
 		}
 	}
 
-	if result {
-		fmt.Printf("%q: Nagra\n", scua)
-	}
+	// if result {
+	// 	fmt.Printf("%q: Nagra\n", scua)
+	// }
 	return result
 }
 
@@ -260,9 +263,9 @@ func isVerimatrix(scua string) bool {
 		}
 	}
 
-	if result {
-		fmt.Printf("%q: Verimatrix\n", scua)
-	}
+	// if result {
+	// 	fmt.Printf("%q: Verimatrix\n", scua)
+	// }
 	return result
 }
 
