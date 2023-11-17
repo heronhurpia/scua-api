@@ -194,18 +194,15 @@ func updateScuaList() {
 		// // Cria variável
 		var scua_temp *set.Set = set.New()
 
-		// // Separa resposta linha por linha e salva na lista de scua
-		sc := bufio.NewScanner(strings.NewReader(string(body)))
-		for sc.Scan() {
+		// Separa resposta linha por linha e salva na lista de scua
+		scua_api := bufio.NewScanner(strings.NewReader(string(body)))
+		for scua_api.Scan() {
 			// Verifica se a linha corresponde a um receptor válido
-			if isValidScua(sc.Text()) {
-				// m.Lock()
-				// scua_set.Insert(string(sc.Text()))
-				// m.Unlock()
-				scua_temp.Insert(string(sc.Text()))
+			if isValidScua(scua_api.Text()) {
+				scua_temp.Insert(string(scua_api.Text()))
 
 			} else {
-				fmt.Printf("%q inválido\n", sc.Text())
+				fmt.Printf("%q inválido\n", scua_api.Text())
 			}
 		}
 
