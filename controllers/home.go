@@ -24,7 +24,7 @@ var data_filename = "scua_data.idx"
 
 // "H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset
 var api_url = "http://localhost:3011/api/get_scua_list"
-var api_limit = 2
+var api_limit = 10
 var api_authorization = "Token"
 var api_token = "744qy4iapitwh3q6"
 var scua_lock sync.RWMutex
@@ -85,7 +85,6 @@ func Init() {
 	// Inicia variável com lista de receptores em RAM
 	scua_set = set.New()
 
-	fmt.Println("Lista de receptores:")
 	r := bufio.NewReader(f)
 	s, _, e := r.ReadLine()
 	for e == nil {
@@ -93,6 +92,7 @@ func Init() {
 		s, _, e = r.ReadLine()
 	}
 
+	// Loop de atualização da lista de receptores
 	go updateScuaList()
 }
 
@@ -158,22 +158,18 @@ func Update(c *gin.Context) {
 func updateScuaList() {
 
 	// Atraso inicial apenas para não misturar mensagens de log
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	for {
-
 		fmt.Printf("\n\n\n")
-		scua_lock.RLock()
-		scua_set.Do(func(i interface{}) {
-			fmt.Printf("%s\n", i)
-		})
-
+		// scua_lock.RLock()
+		// scua_set.Do(func(i interface{}) {
+		// 	fmt.Printf("%s\n", i)
+		// })
 		offset := scua_set.Len()
-
-		scua_lock.RUnlock()
+		// scua_lock.RUnlock()
 
 		// // Busca lista de scua
-
 		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores na memória: ", offset)
 		body, err := get_scua_list(offset)
 
@@ -192,39 +188,42 @@ func updateScuaList() {
 		}
 
 		// // Cria variável
-		var scua_temp *set.Set = set.New()
+		var scua_valid *set.Set = set.New()
 
 		// Separa resposta linha por linha e salva na lista de scua
+		var lines int
 		scua_api := bufio.NewScanner(strings.NewReader(string(body)))
 		for scua_api.Scan() {
 			// Verifica se a linha corresponde a um receptor válido
 			if isValidScua(scua_api.Text()) {
-				scua_temp.Insert(string(scua_api.Text()))
+				scua_valid.Insert(string(scua_api.Text()))
+				lines += 1
 
 			} else {
 				fmt.Printf("%q inválido\n", scua_api.Text())
 			}
 		}
+		fmt.Println(time.Now().Format("15:04:05"), " - linhas recebidas via api: ", lines)
 
 		// Número de receptores recebidos via API
-		final := scua_temp.Len()
+		final := scua_valid.Len()
 		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores recebidos via api: ", final)
-		scua_temp.Do(func(i interface{}) {
-			fmt.Printf("%s\n", i)
-		})
+		// scua_valid.Do(func(i interface{}) {
+		// 	fmt.Printf("%s\n", i)
+		// })
 
 		// Filtra apenas os receptores que ainda não estão na lista
 		var scua_new *set.Set = set.New()
 
 		scua_lock.RLock()
-		scua_new = scua_temp.Difference(scua_set)
+		scua_new = scua_valid.Difference(scua_set)
 		scua_lock.RUnlock()
 
-		new := scua_new.Len()
-		fmt.Println(time.Now().Format("15:04:05"), " - novos receptores recebidos via api: ", new)
-		scua_new.Do(func(i interface{}) {
-			fmt.Printf("%s\n", i)
-		})
+		// new := scua_new.Len()
+		// fmt.Println(time.Now().Format("15:04:05"), " - novos receptores recebidos via api: ", new)
+		// scua_new.Do(func(i interface{}) {
+		// 	fmt.Printf("%s\n", i)
+		// })
 
 		/* Se não houve alteração na quantidade receptores, entra em standby */
 		if scua_new.Len() == 0 {
@@ -232,22 +231,6 @@ func updateScuaList() {
 			time.Sleep(time.Minute)
 			continue
 		}
-
-		// Atualiza variável com lista de scua
-		scua_lock.Lock()
-		scua_new.Do(func(i interface{}) {
-			scua_set.Insert(i)
-		})
-		scua_lock.Unlock()
-
-		fmt.Println(time.Now().Format("15:04:05"), " - lista final")
-		scua_lock.RLock()
-		scua_set.Do(func(i interface{}) {
-			fmt.Printf("%s\n", i)
-		})
-		total := scua_set.Len()
-		scua_lock.RUnlock()
-		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores após união: ", total)
 
 		// Abre arquivo destino dos dados
 		f, err := os.OpenFile(data_filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
@@ -258,15 +241,25 @@ func updateScuaList() {
 		}
 
 		// Salva dados no arquivo
-		scua_set.Do(func(i interface{}) {
-			if _, err = f.WriteString(string(body)); err != nil {
+		scua_new.Do(func(i interface{}) {
+			var data string = fmt.Sprintf("%s\n", i)
+			if _, err = f.WriteString(string(data)); err != nil {
 				fmt.Println(time.Now().Format("15:04:05"), " - falha ao salvar dados")
 			}
 		})
 		f.Close()
 
+		// Atualiza variável com lista de scua
+		scua_lock.Lock()
+		scua_new.Do(func(i interface{}) {
+			scua_set.Insert(i)
+		})
+		total := scua_set.Len()
+		scua_lock.Unlock()
+		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores após união: ", total)
+
 		fmt.Println(time.Now().Format("15:04:05"), " - fim da atualização da lista de scuas")
-		time.Sleep(10 * time.Minute)
+		time.Sleep(time.Minute)
 	}
 }
 
