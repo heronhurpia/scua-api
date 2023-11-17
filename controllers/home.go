@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -25,10 +24,10 @@ var data_filename = "scua_data.idx"
 
 // "H 'Token: 744qy4iapitwh3q6' 'http://localhost:3011/api/get_scua_list?limit=1000&offset=%d'", offset
 var api_url = "http://localhost:3011/api/get_scua_list"
-var api_limit = 100
+var api_limit = 2
 var api_authorization = "Token"
 var api_token = "744qy4iapitwh3q6"
-var m sync.Mutex
+var scua_lock sync.RWMutex
 
 type response struct {
 	Result  bool   `json:"res"`
@@ -39,25 +38,30 @@ type response struct {
 func FindScua(c *gin.Context) {
 
 	var r bool
-	var m string
+	var msg string
 
 	// scua que deve ser procurado
 	scua := c.Param("scua")
 	//log.Println([]byte(scua))
 
-	if scua_set.Has(scua) {
+	scua_lock.RLock()
+	has_scua := scua_set.Has(scua)
+	len_scua := scua_set.Len()
+	scua_lock.RUnlock()
+
+	if has_scua {
 		r = true
-		m = "Encontrado " + scua
+		msg = "Encontrado " + scua
 	} else {
 		r = false
-		m = fmt.Sprintf("%T %q não localizado em %d itens", scua, scua, scua_set.Len())
+		msg = fmt.Sprintf("%T %q não localizado em %d itens", scua, scua, len_scua)
 	}
 
 	// Resposta da solicitação
 	var res = []response{
 		{
 			Result:  r,
-			Message: m},
+			Message: msg},
 	}
 
 	c.IndentedJSON(http.StatusOK, res)
@@ -158,64 +162,114 @@ func updateScuaList() {
 
 	for {
 
-		// Busca lista de scua
+		fmt.Printf("\n\n\n")
+		scua_lock.RLock()
+		scua_set.Do(func(i interface{}) {
+			fmt.Printf("%s\n", i)
+		})
+
 		offset := scua_set.Len()
+
+		scua_lock.RUnlock()
+
+		// // Busca lista de scua
+
+		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores na memória: ", offset)
 		body, err := get_scua_list(offset)
 
-		// Se não consegiu contato com API, entrar em standby
+		// // Se não consegiu contato com API, entrar em standby
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println("Erro de conexão com API")
 			time.Sleep(60 * time.Minute)
 			continue
 		}
 
-		// Caso não existam novas linhas, entrar em standby por 1 hora
+		// // Caso não existam novas linhas, entrar em standby por 1 hora
 		if len(body) == 0 {
 			fmt.Println("Não foram encontrados novos scuas no db")
 			time.Sleep(60 * time.Minute)
 			continue
 		}
 
-		// Separa resposta linha por linha e salva na lista de scua
+		// // Cria variável
+		var scua_temp *set.Set = set.New()
+
+		// // Separa resposta linha por linha e salva na lista de scua
 		sc := bufio.NewScanner(strings.NewReader(string(body)))
 		for sc.Scan() {
-
 			// Verifica se a linha corresponde a um receptor válido
 			if isValidScua(sc.Text()) {
-				// Salva dados garantindo acesso não concorrente
-				m.Lock()
-				scua_set.Insert(string(sc.Text()))
-				m.Unlock()
+				// m.Lock()
+				// scua_set.Insert(string(sc.Text()))
+				// m.Unlock()
+				scua_temp.Insert(string(sc.Text()))
+
 			} else {
 				fmt.Printf("%q inválido\n", sc.Text())
-				break
 			}
 		}
 
-		// Fim da verificação
-		final := scua_set.Len()
-		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores na memória: ", final)
+		// Número de receptores recebidos via API
+		final := scua_temp.Len()
+		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores recebidos via api: ", final)
+		scua_temp.Do(func(i interface{}) {
+			fmt.Printf("%s\n", i)
+		})
+
+		// Filtra apenas os receptores que ainda não estão na lista
+		var scua_new *set.Set = set.New()
+
+		scua_lock.RLock()
+		scua_new = scua_temp.Difference(scua_set)
+		scua_lock.RUnlock()
+
+		new := scua_new.Len()
+		fmt.Println(time.Now().Format("15:04:05"), " - novos receptores recebidos via api: ", new)
+		scua_new.Do(func(i interface{}) {
+			fmt.Printf("%s\n", i)
+		})
 
 		/* Se não houve alteração na quantidade receptores, entra em standby */
-		if offset == final {
+		if scua_new.Len() == 0 {
 			fmt.Println(time.Now().Format("15:04:05"), " - não houve alteração no total de receptores")
 			time.Sleep(time.Minute)
 			continue
 		}
-		fmt.Println(time.Now().Format("15:04:05"), " - acrescentar ", final-offset, " receptores")
 
-		// Acrescenta os dados recebidos ao arquivo
+		// Atualiza variável com lista de scua
+		scua_lock.Lock()
+		scua_new.Do(func(i interface{}) {
+			scua_set.Insert(i)
+		})
+		scua_lock.Unlock()
+
+		fmt.Println(time.Now().Format("15:04:05"), " - lista final")
+		scua_lock.RLock()
+		scua_set.Do(func(i interface{}) {
+			fmt.Printf("%s\n", i)
+		})
+		total := scua_set.Len()
+		scua_lock.RUnlock()
+		fmt.Println(time.Now().Format("15:04:05"), " - total de receptores após união: ", total)
+
+		// Abre arquivo destino dos dados
 		f, err := os.OpenFile(data_filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err != nil {
-			panic(err)
+			fmt.Println(time.Now().Format("15:04:05"), " - falha ao abrir arquivo")
+			time.Sleep(10 * time.Minute)
+			continue
 		}
-		if _, err = f.WriteString(string(body)); err != nil {
-			panic(err)
-		}
+
+		// Salva dados no arquivo
+		scua_set.Do(func(i interface{}) {
+			if _, err = f.WriteString(string(body)); err != nil {
+				fmt.Println(time.Now().Format("15:04:05"), " - falha ao salvar dados")
+			}
+		})
 		f.Close()
 
 		fmt.Println(time.Now().Format("15:04:05"), " - fim da atualização da lista de scuas")
-		time.Sleep(time.Minute)
+		time.Sleep(10 * time.Minute)
 	}
 }
 
@@ -271,9 +325,6 @@ func isVerimatrix(scua string) bool {
 
 // Busca lista de recetores na api
 func get_scua_list(offset int) (string, error) {
-
-	fmt.Println("")
-	fmt.Println(time.Now().Format("15:04:05"), " - total de receptores na memória: ", offset)
 
 	// Create an HTTP client
 	client := &http.Client{}
