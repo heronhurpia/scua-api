@@ -28,7 +28,7 @@ curl -H "Token: 744qy4iapitwh3q6" 'http://localhost:3011/api/get_scua_list?limit
 
 ### todo
 + ~~Separar função para busca na url~~
-+ Simular resposta errada da api
++ ~~Simular resposta errada da api~~
 + ~~Criar validador de resposta com lista de receptores~~
 + ~~criar lista de constantes no controller~~
 + ~~Nome do arquivo~~
